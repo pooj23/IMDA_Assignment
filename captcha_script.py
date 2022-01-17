@@ -50,6 +50,7 @@ import cv2
 import pickle
 import os.path
 import numpy as np
+import imutils
 from imutils import paths
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.model_selection import train_test_split
@@ -118,19 +119,22 @@ class Captcha():
         f,ax = plt.subplots(2,2, figsize=(5,3))
         for i in range(4):
             img = imread(sample_images[i])
-            print("Shape of image: ", img.shape)
+            #print("Shape of image: ", img.shape)
             ax[i//2, i%2].imshow(img)
             ax[i//2, i%2].axis('off')
-        plt.show()
+        #plt.show()
+        #plt.close('all')
         data = []
+
         for image_path in images:
             image = cv2.imread(image_path)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             # Resize the letter so it fits in a 20x20 pixel box
-            #image = resize_to_fit(image, 20, 20)
+            image = resize_to_fit(image, 20, 20)
             # Add a third channel dimension to the image
             image = np.expand_dims(image, axis=2)
             # Add the letter image and it's label to our training data
+            #print("preprocessed: ", image.shape)
             data.append(image)
 
         data = np.array(data, dtype="float") / 255.0
@@ -149,15 +153,15 @@ class Captcha():
         with open(self.model_labels, "wb") as f:
             pickle.dump(lb, f)
 
-        print("x_train: ", x_train)
-        print("y_train: ", y_train)
+        #print("x_train: ", x_train)
+        #print("y_train: ", y_train)
 
         print("Total number of images in the training set: ", len(x_train))
         print("Total number of labels in the training set: ", len(y_train))
         print("Total number of images in the validationn set: ", len(x_valid))
         print("Total number of lbels in the validationn set: ", len(y_valid))
 
-        return x_train, y_train, x_valid, y_valid, unseen_captchas
+        return x_train, y_train, x_valid, y_valid, unseen_captchas, images
     
     def nn_model(self, x_train, y_train, x_valid, y_valid):
 
@@ -165,7 +169,7 @@ class Captcha():
         model = Sequential()
 
         # First convolutional layer with max pooling
-        model.add(Conv2D(20, (5, 5), padding="same", input_shape=(30, 60, 1), activation="relu"))
+        model.add(Conv2D(20, (5, 5), padding="same", input_shape=(20, 20, 1), activation="relu"))
         model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
 
         # Second convolutional layer with max pooling
@@ -182,17 +186,149 @@ class Captcha():
         # Ask Keras to build the TensorFlow model behind the scenes
         model.compile(loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
 
-        model.fit(x_train, y_train, validation_data=(x_valid, y_valid), batch_size=4, epochs=10, verbose=1)
+        model.fit(x_train, y_train, validation_data=(x_valid, y_valid), batch_size=6, epochs=100, verbose=1)
 
         model.save(self.model_path)
 
         return 1
 
+    def read_unseen_captchas(self, unseen_captchas, images):
+
+        # Load up the model labels (so we can translate model predictions to actual letters)
+        with open(self.model_labels, "rb") as f:
+            lb = pickle.load(f)
+
+        # Load the trained neural network
+        model = load_model(self.model_path)
+
+        print("Number of unseen captchas: ", len(unseen_captchas))
+        print(unseen_captchas)
+
+        #unseen_captchas = self.im_path / 'input' / 'input100.jpg'
+        #image_path_1 = "C:\Users\pooji\Documents\IMDA_Assignment\sampleCaptchas\input\input100.jpg"
+        #image_path_2 = "C:\Users\pooji\Documents\IMDA_Assignment\sampleCaptchas\input\input21.jpg"
+        
+        for image_path in unseen_captchas:
+            print("for: ", image_path)
+            image = cv2.imread(image_path)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            # Resize the letter so it fits in a 20x20 pixel box
+            image = resize_to_fit(image, 20, 20)
+            # Add a third channel dimension to the image
+            image = np.expand_dims(image, axis=2)
+            print("preprocessed: ", image.shape)
+            thresh = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+            image= np.array(image, dtype="float") / 255.0
+
+
+            # find the contours (continuous blobs of pixels) the image
+            contours = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            # Hack for compatibility with different OpenCV versions
+            contours = contours[0]
+
+            print("countours", len(contours))
+
+            letter_image_regions = []
+
+            # Now we can loop through each of the four contours and extract the letter
+            # inside of each one
+            for contour in contours:
+                # Get the rectangle that contains the contour
+                (x, y, w, h) = cv2.boundingRect(contour)
+
+                # Compare the width and height of the contour to detect letters that
+                # are conjoined into one chunk
+                if w / h > 1.25:
+                    print("Contour is too wide")
+                    # This contour is too wide to be a single letter!
+                    # Split it in half into two letter regions!
+                    half_width = int(w / 2)
+                    letter_image_regions.append((x, y, half_width, h))
+                    letter_image_regions.append((x + half_width, y, half_width, h))
+                else:
+                    print("This is a normal letter by itself")
+                    letter_image_regions.append((x, y, w, h))
+
+            print("letter_image_regions", letter_image_regions)
+            print("len(letter_image_regions)", len(letter_image_regions))
+            #if len(letter_image_regions) != 5:
+            #    continue
+
+            letter_image_regions = sorted(letter_image_regions, key=lambda x: x[0])
+
+            predictions = []
+
+            # loop over the letters
+            for letter_bounding_box in letter_image_regions:
+                # Grab the coordinates of the letter in the image
+                x, y, w, h = letter_bounding_box
+            
+                # Extract the letters
+                letter_image = image[y:y + h, x:x + w]
+
+                # Re-size the letter image to 20x20 pixels to match training data
+                letter_image = resize_to_fit(letter_image, 20, 20)
+
+                # Turn the single image into a 4d list of images to make Keras happy
+                letter_image = np.expand_dims(letter_image, axis=2)
+                letter_image = np.expand_dims(letter_image, axis=0)
+
+                # Ask the neural network to make a prediction
+                prediction = model.predict(letter_image)
+
+                # Convert the one-hot-encoded prediction back to a normal letter
+                letter = lb.inverse_transform(prediction)[0]
+                print("letter", letter)
+                predictions.append(letter)
+
+
+            # Print the captcha's text
+            captcha_text = " ".join(predictions)
+            print("CAPTCHA text is: {}".format(letter))
+            print("?? CAPTCHA text is: {}".format(captcha_text))
+
+
     def run_all(self):
         #self.clean_data()
-        x_train, y_train, x_valid, y_valid, unseen_captchas = self.load_data()
+        x_train, y_train, x_valid, y_valid, unseen_captchas, images = self.load_data()
         self.nn_model(x_train, y_train, x_valid, y_valid)
+        self.read_unseen_captchas(unseen_captchas, images)
         
+def resize_to_fit(image, width, height):
+    """
+    A helper function to resize an image to fit within a given size
+    :param image: image to resize
+    :param width: desired width in pixels
+    :param height: desired height in pixels
+    :return: the resized image
+    """
+
+    # grab the dimensions of the image, then initialize
+    # the padding values
+    (h, w) = image.shape[:2]
+
+    # if the width is greater than the height then resize along
+    # the width
+    if w > h:
+        image = imutils.resize(image, width=width)
+
+    # otherwise, the height is greater than the width so resize
+    # along the height
+    else:
+        image = imutils.resize(image, height=height)
+
+    # determine the padding values for the width and height to
+    # obtain the target dimensions
+    padW = int((width - image.shape[1]) / 2.0)
+    padH = int((height - image.shape[0]) / 2.0)
+
+    # pad the image then apply one more resizing to handle any
+    # rounding issues
+    image = cv2.copyMakeBorder(image, padH, padH, padW, padW, cv2.BORDER_REPLICATE)
+    image = cv2.resize(image, (width, height))
+
+    # return the pre-processed image
+    return image
 
 def main():
     im_path = Path("../IMDA_Assignment/sampleCaptchas")
