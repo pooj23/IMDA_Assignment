@@ -263,6 +263,8 @@ class Captcha():
 
         # Load the trained neural network
         model = load_model(self.model_path)
+        results_file = self.save_path / 'results.txt'
+        file1 = open(results_file,"w")
         
         unseen_captchas = sorted(list(map(str, list(self.data_dir.glob("*.jpg")))))
         print("Number of unseen captchas: ", len(unseen_captchas))
@@ -323,12 +325,16 @@ class Captcha():
             captcha_text = " ".join(predictions)
             print("CAPTCHA text is: {}".format(captcha_text))
 
+            file1.writelines(captcha_text + "  for  " + image_path + "\n")
+        
+        file1.close() #to change file access mod   
+
 
     def run_all(self):
         #self.clean_data()
-        self.load_data()
-        x_train, y_train, x_valid, y_valid = self.processing_training_data()
-        self.nn_model(x_train, y_train, x_valid, y_valid)
+        #self.load_data()
+        #x_train, y_train, x_valid, y_valid = self.processing_training_data()
+        #self.nn_model(x_train, y_train, x_valid, y_valid)
         self.read_unseen_captchas()
         
 def resize_to_fit(image, width, height):
