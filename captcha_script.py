@@ -132,7 +132,7 @@ class Captcha():
                 letter_image = image[y - 2:y + h + 2, x - 2:x + w + 2]
                 letter_image = resize_to_fit(letter_image, 20, 20)
                 # Get the folder to save the image in            
-                save_path = self.im_path / 'output_folder' / ('%s' % letter_text) 
+                save_path = self.im_path / 'preprocessed_output_folder' / ('%s' % letter_text) 
                 # if the output directory does not exist, create it
                 if not os.path.exists(save_path):
                     os.makedirs(save_path)
@@ -147,7 +147,7 @@ class Captcha():
         
         data = []
         labels = []
-        for image_path in paths.list_images(self.im_path / 'output_folder'):
+        for image_path in paths.list_images(self.im_path / 'preprocessed_output_folder'):
             print(image_path)
 
             # Load the image and convert it to grayscale
@@ -290,7 +290,7 @@ class Captcha():
 
 
     def run_all(self):
-        self.clean_data()
+        #self.clean_data()
         self.load_data()
         x_train, y_train, x_valid, y_valid = self.processing_training_data()
         self.nn_model(x_train, y_train, x_valid, y_valid)
