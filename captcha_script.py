@@ -1,60 +1,19 @@
+import cv2
 import os
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from pathlib import Path
-from collections import Counter
-
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
-
-from itertools import chain
 import fnmatch
 import shutil
-
-from skimage.io import imread
-
-import gc
-
-import glob
-import h5py
-import itertools
-import random as rn
-
-import seaborn as sns
-from pathlib import Path
-from collections import Counter
-
-from skimage.transform import resize
-from sklearn.metrics import confusion_matrix
-#from mlxtend.plotting import plot_confusion_matrix
-
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras.optimizers import Adam, SGD, RMSprop
-
-from keras.models import Sequential, Model, load_model
-from keras.layers import Conv2D, MaxPooling2D, Dense, Dropout
-from keras.layers import Input, Flatten, BatchNormalization, Lambda
-from keras.layers import CuDNNGRU, CuDNNLSTM, Bidirectional, LSTM, GRU
-from keras.layers import Add, Concatenate, Reshape
-
-from keras.callbacks import ModelCheckpoint, Callback, EarlyStopping
-from tensorflow.keras.utils import to_categorical
-
-from keras import backend as K
-
-import cv2
 import pickle
 import os.path
 import numpy as np
 import imutils
+import matplotlib.pyplot as plt
+from skimage.io import imread
+from itertools import chain
+from pathlib import Path
 from imutils import paths
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.model_selection import train_test_split
-from keras.models import Sequential
+from keras.models import Sequential, Model, load_model
 from keras.layers.convolutional import Conv2D, MaxPooling2D
 from keras.layers.core import Flatten, Dense
 
@@ -249,7 +208,7 @@ class Captcha():
         # Ask Keras to build the TensorFlow model behind the scenes
         model.compile(loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"])
 
-        model.fit(x_train, y_train, validation_data=(x_valid, y_valid), batch_size=6, epochs=200, verbose=1)
+        model.fit(x_train, y_train, validation_data=(x_valid, y_valid), batch_size=6, epochs=150, verbose=1)
 
         model.save(self.model_path)
 
@@ -331,10 +290,10 @@ class Captcha():
 
 
     def run_all(self):
-        #self.clean_data()
-        #self.load_data()
-        #x_train, y_train, x_valid, y_valid = self.processing_training_data()
-        #self.nn_model(x_train, y_train, x_valid, y_valid)
+        self.clean_data()
+        self.load_data()
+        x_train, y_train, x_valid, y_valid = self.processing_training_data()
+        self.nn_model(x_train, y_train, x_valid, y_valid)
         self.read_unseen_captchas()
         
 def resize_to_fit(image, width, height):
