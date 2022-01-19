@@ -141,7 +141,7 @@ class Captcha():
                 p = os.path.join(save_path, "{}.png".format(str(letter_text)))
                 cv2.imwrite(p, letter_image)
 
-        return unseen_captchas
+        return 1
 
     def processing_training_data(self):
         
